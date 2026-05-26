@@ -32,6 +32,7 @@ _downloader = importlib.import_module("scribd-downloader")
 build_chrome_options = _downloader.build_chrome_options
 download_document = _downloader.download_document
 extract_urls_from_text = _downloader.extract_urls_from_text
+get_filename_from_url = _downloader.get_filename_from_url
 
 app = Flask(__name__)
 
@@ -407,7 +408,9 @@ def start_download():
     )
     thread.start()
 
-    return jsonify(job_id=job_id, count=len(urls), skipped=len(duplicates), concurrency=concurrency)
+    return jsonify(
+        job_id=job_id, count=len(urls), skipped=len(duplicates), concurrency=concurrency
+    )
 
 
 @app.route("/api/stop/<job_id>", methods=["POST"])
@@ -440,6 +443,7 @@ def _append_to_log(output_dir, url, filename):
     log_path = os.path.join(output_dir, DOWNLOAD_LOG_FILENAME)
     os.makedirs(output_dir, exist_ok=True)
     from datetime import datetime
+
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with _log_lock:
         with open(log_path, "a") as f:
@@ -449,13 +453,48 @@ def _append_to_log(output_dir, url, filename):
 MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 3
 
+_job_filename_registry: dict[str, dict] = {}
+_registry_lock = threading.Lock()
 
-def _worker_loop(worker_id, url_batch, total_urls, offset, output_dir, q, cancel_event):
+
+def _unique_filepath(output_dir: str, base_filename: str, job_id: str) -> str:
+    """
+    Return a filepath that does not collide with files already saved in this
+    job (or on disk).  If ``base_filename`` is already taken, appends _(2),
+    _(3), … before the extension until a free name is found.
+    """
+    with _registry_lock:
+        registry = _job_filename_registry.get(job_id)
+
+    if registry is None:
+        lock = threading.Lock()
+        used: set = set()
+    else:
+        lock = registry["lock"]
+        used = registry["names"]
+
+    stem, ext = os.path.splitext(base_filename)
+    candidate = base_filename
+    counter = 2
+
+    with lock:
+        while candidate in used:
+            candidate = f"{stem}_({counter}){ext}"
+            counter += 1
+        used.add(candidate)
+
+    return os.path.join(output_dir, candidate)
+
+
+def _worker_loop(
+    worker_id, url_batch, total_urls, offset, output_dir, q, cancel_event, job_id
+):
     """
     Each worker owns ONE Chrome browser and processes its assigned URLs
     sequentially within that browser, retrying on failure.
     """
     import time as _time
+
     from selenium import webdriver
 
     worker_name = f"W_{worker_id}"
@@ -486,7 +525,12 @@ def _worker_loop(worker_id, url_batch, total_urls, offset, output_dir, q, cancel
 
     try:
         _start_browser()
-        q.put(("log", f"({worker_name}) Browser started — assigned {len(url_batch)} URL(s)"))
+        q.put(
+            (
+                "log",
+                f"({worker_name}) Browser started — assigned {len(url_batch)} URL(s)",
+            )
+        )
 
         for local_i, url in enumerate(url_batch):
             global_i = offset + local_i + 1
@@ -502,36 +546,73 @@ def _worker_loop(worker_id, url_batch, total_urls, offset, output_dir, q, cancel
                     break
 
                 try:
-                    saved = download_document(driver, url, output_dir=output_dir)
+                    original_name = get_filename_from_url(url)
+                    unique_path = _unique_filepath(output_dir, original_name, job_id)
+
+                    tmp_dir = os.path.join(
+                        output_dir, f".tmp_{worker_name}_{uuid.uuid4().hex[:8]}"
+                    )
+                    os.makedirs(tmp_dir, exist_ok=True)
+                    try:
+                        saved = download_document(driver, url, output_dir=tmp_dir)
+                    finally:
+                        pass
+
                     if cancel_event.is_set():
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
                         break
                     if saved:
+                        os.replace(saved, unique_path)
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
+                        saved = unique_path
                         _append_to_log(output_dir, url, os.path.basename(saved))
-                        q.put(("success", f"✓ ({worker_name}) Saved: {os.path.basename(saved)}"))
+                        q.put(
+                            (
+                                "success",
+                                f"✓ ({worker_name}) Saved: {os.path.basename(saved)}",
+                            )
+                        )
                         results.append((url, "ok", saved))
                         last_error = None
                         break
                     else:
+                        shutil.rmtree(tmp_dir, ignore_errors=True)
                         last_error = "Download returned no file"
                 except Exception as exc:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
                     last_error = str(exc)
 
                 # On failure, restart the browser and retry
                 if attempt < MAX_RETRIES and not cancel_event.is_set():
-                    q.put(("warn", f"⟳ ({worker_name}) Attempt {attempt}/{MAX_RETRIES} failed: {last_error}. Restarting browser..."))
+                    q.put(
+                        (
+                            "warn",
+                            f"⟳ ({worker_name}) Attempt {attempt}/{MAX_RETRIES} failed: {last_error}. Restarting browser...",
+                        )
+                    )
                     _close_browser()
                     _time.sleep(RETRY_DELAY_SECONDS)
                     try:
                         _start_browser()
                     except Exception as restart_err:
-                        q.put(("error_msg", f"✗ ({worker_name}) Browser restart failed: {restart_err}"))
+                        q.put(
+                            (
+                                "error_msg",
+                                f"✗ ({worker_name}) Browser restart failed: {restart_err}",
+                            )
+                        )
                         last_error = str(restart_err)
                         break
 
             if cancel_event.is_set() and not any(r[0] == url for r in results):
                 results.append((url, "cancelled", None))
             elif last_error:
-                q.put(("error_msg", f"✗ ({worker_name}) Failed after {MAX_RETRIES} attempts: {url} — {last_error}"))
+                q.put(
+                    (
+                        "error_msg",
+                        f"✗ ({worker_name}) Failed after {MAX_RETRIES} attempts: {url} — {last_error}",
+                    )
+                )
                 results.append((url, "failed", None))
 
     except Exception as exc:
@@ -564,6 +645,9 @@ def _run_job(
     old_stdout = sys.stdout
     sys.stdout = LogCapture(q, old_stdout)
 
+    with _registry_lock:
+        _job_filename_registry[job_id] = {"lock": threading.Lock(), "names": set()}
+
     try:
         if duplicates:
             q.put(("progress", f"Skipped {len(duplicates)} duplicate link(s):"))
@@ -586,7 +670,12 @@ def _run_job(
             q.put(("progress", "All documents already downloaded."))
         else:
             actual_concurrency = min(concurrency, len(pending_urls))
-            q.put(("progress", f"Launching {actual_concurrency} browser(s) for {len(pending_urls)} document(s)..."))
+            q.put(
+                (
+                    "progress",
+                    f"Launching {actual_concurrency} browser(s) for {len(pending_urls)} document(s)...",
+                )
+            )
 
             # Split URLs round-robin across workers
             batches: list[list[str]] = [[] for _ in range(actual_concurrency)]
@@ -598,13 +687,22 @@ def _run_job(
             acc = 0
             # The round-robin means URLs aren't contiguous, so just use a counter
             # We'll pass total and let the worker compute global index
-            with ThreadPoolExecutor(max_workers=actual_concurrency, thread_name_prefix="W") as pool:
+            with ThreadPoolExecutor(
+                max_workers=actual_concurrency, thread_name_prefix="W"
+            ) as pool:
                 futures = []
                 offset = 0
                 for wid, batch in enumerate(batches):
                     fut = pool.submit(
-                        _worker_loop, wid, batch, len(pending_urls), offset,
-                        output_dir, q, cancel_event
+                        _worker_loop,
+                        wid,
+                        batch,
+                        len(pending_urls),
+                        offset,
+                        output_dir,
+                        q,
+                        cancel_event,
+                        job_id,
                     )
                     futures.append(fut)
                     offset += len(batch)
@@ -626,21 +724,29 @@ def _run_job(
     finally:
         sys.stdout = old_stdout
 
-        q.put((
-            "done",
-            json.dumps({
-                "succeeded": succeeded,
-                "failed": failed,
-                "cancelled": cancelled,
-                "total": len(urls),
-                "folder": output_dir,
-            }),
-        ))
+        q.put(
+            (
+                "done",
+                json.dumps(
+                    {
+                        "succeeded": succeeded,
+                        "failed": failed,
+                        "cancelled": cancelled,
+                        "total": len(urls),
+                        "folder": output_dir,
+                    }
+                ),
+            )
+        )
 
         def _cleanup():
             import time
+
             time.sleep(30)
             _jobs.pop(job_id, None)
+            with _registry_lock:
+                _job_filename_registry.pop(job_id, None)
+
         threading.Thread(target=_cleanup, daemon=True).start()
 
 
@@ -662,10 +768,14 @@ def stream(job_id):
             if event_type == "done":
                 break
 
-    return Response(generate(), mimetype="text/event-stream", headers={
-        "Cache-Control": "no-cache",
-        "X-Accel-Buffering": "no",
-    })
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 if __name__ == "__main__":
