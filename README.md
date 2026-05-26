@@ -2,76 +2,97 @@
   <img src="assets/scribd.svg" alt="Scribd" width="200">
 </p>
 
-<h1 align="center">Scribd Downloader</h1>
+<h1 align="center">Scribd Downloader Parallel</h1>
 
 <p align="center">
-  <b>Download Scribd documents as PDF for free - Fast, automated, and runs in background!</b>
+  <b>A fork of Scribd Downloader with a web UI, batch input, parallel browser workers, retries, stop, and resume.</b>
 </p>
 
 <p align="center">
   <a href="https://www.python.org/downloads/">
-    <img src="https://img.shields.io/badge/Python-3.7+-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.7+">
+    <img src="https://img.shields.io/badge/Python-3.9+-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+">
   </a>
   <a href="https://pypi.org/project/selenium/">
-    <img src="https://img.shields.io/badge/Selenium-4.0+-green?style=for-the-badge&logo=selenium&logoColor=white" alt="Selenium 4.0+">
+    <img src="https://img.shields.io/badge/Selenium-4.32+-green?style=for-the-badge&logo=selenium&logoColor=white" alt="Selenium 4.32+">
   </a>
-  <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-MIT-orange?style=for-the-badge" alt="MIT License">
+  <a href="https://flask.palletsprojects.com/">
+    <img src="https://img.shields.io/badge/Flask-3.0+-black?style=for-the-badge&logo=flask&logoColor=white" alt="Flask 3.0+">
+  </a>
+  <a href="https://github.com/niseruu/scribd-downloader-Parallel/stargazers">
+    <img src="https://img.shields.io/github/stars/niseruu/scribd-downloader-Parallel?style=for-the-badge&logo=github" alt="GitHub Stars">
   </a>
 </p>
 
-<p align="center">
-  <a href="https://buymeacoffee.com/mrsami">
-    <img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee">
-  </a>
-  <a href="https://github.com/sponsors/themrsami">
-    <img src="https://img.shields.io/badge/Sponsor-ea4aaa?style=for-the-badge&logo=github-sponsors&logoColor=white" alt="GitHub Sponsors">
-  </a>
-  <a href="https://github.com/themrsami/scribd-downloader/stargazers">
-    <img src="https://img.shields.io/github/stars/themrsami/scribd-downloader?style=for-the-badge&logo=github" alt="GitHub Stars">
-  </a>
-</p>
+---
+
+## Fork Notice
+
+This repository is a fork of [themrsami/scribd-downloader](https://github.com/themrsami/scribd-downloader).
+
+The original project provides the core Selenium-based Scribd-to-PDF downloader. This fork keeps that downloader and adds a browser-based workflow for larger download runs:
+
+- Flask web UI in `web.py`
+- Batch URL extraction from pasted text
+- Parallel Chrome workers
+- Per-folder output under `downloads/`
+- `download_log.txt` resume tracking
+- Duplicate URL skipping
+- Stop button for active web jobs
+- Retry handling with browser restart
+- CLI batch mode using the same downloader logic
 
 ---
 
 ## Features
 
-- **One-click download** — Just paste the Scribd URL and get your PDF
-- **Web UI** — Browser-based interface with real-time progress logs
-- **Batch download** — Paste multiple links at once (CLI or Web UI)
-- **Parallel browsers** — Run N Chrome instances side-by-side to download faster
-- **Stop button** — Cancel a running batch from the web UI at any time
-- **Resume support** — A `download_log.txt` tracks completed URLs; re-submitting the same links skips already-downloaded files
-- **Duplicate detection** — Duplicate URLs are detected and skipped with a notification
-- **Retry on failure** — Each URL is retried up to 3 times with automatic browser restart
-- **Custom output folder** — Save PDFs into a named subfolder under `downloads/`
-- **Supports both URL styles** — Works with `/document/...` and legacy `/doc/...` links
-- **Runs in background** — Headless Chrome, no browser window pops up
-- **Clean PDFs** — No cookie banners, toolbars, or watermarks
-- **Dynamic page size** — Detects the rendered Scribd page size
-- **Large file friendly** — Streamed PDF export with longer timeouts
-- **Auto filename** — PDF named after the document URL automatically
-- **No login required** — Works without Scribd account
+- **Web UI** - Paste a folder name and a list of Scribd URLs, then watch live progress in the browser.
+- **Parallel downloads** - Run multiple Chrome instances at the same time for faster batch jobs.
+- **Batch input** - Paste one URL per line or mixed text; valid Scribd links are extracted automatically.
+- **Resume support** - Completed URLs are recorded in `downloads/<folder>/download_log.txt` and skipped on later runs.
+- **Duplicate detection** - Repeated URLs in the same submission are skipped before the job starts.
+- **Stop button** - Cancel remaining work from the web UI while keeping already-saved PDFs.
+- **Retry on failure** - Each URL is retried up to 3 times with a fresh browser if needed.
+- **Custom output folders** - Keep different download sets separated under `downloads/`.
+- **CLI single or batch mode** - Use the terminal workflow when you do not need the web UI.
+- **Reliable PDF export** - Uses headless Chrome, dynamic page sizing, streamed PDF export, longer timeouts, and render-settle checks.
+- **Scribd URL support** - Works with `/document/...` and legacy `/doc/...` links.
+- **No Scribd login required** - Designed for publicly accessible Scribd document pages.
 
 ---
 
 ## Requirements
 
-- Python 3.7 or higher
-- Google Chrome browser installed
-- Chrome WebDriver (auto-managed by Selenium)
+- Python 3.9 or newer
+- Google Chrome installed
+- Chrome WebDriver support through Selenium Manager
 
 ---
 
 ## Installation
 
-1. **Clone the repository**
+1. Clone this fork:
+
    ```bash
-   git clone https://github.com/themrsami/scribd-downloader.git
-   cd scribd-downloader
+   git clone https://github.com/niseruu/scribd-downloader-Parallel.git
+   cd scribd-downloader-Parallel
    ```
 
-2. **Install dependencies**
+2. Optional but recommended: create a virtual environment.
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   ```
+
+   On Windows PowerShell:
+
+   ```powershell
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   ```
+
+3. Install dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -80,186 +101,163 @@
 
 ## Usage
 
-### Web UI (recommended)
+### Web UI
 
-1. **Start the web server**
-   ```bash
-   python web.py
-   ```
+Start the Flask server:
 
-2. **Open** `http://localhost:5000` in your browser.
+```bash
+python web.py
+```
 
-3. **Fill in the form:**
-   - **Folder Name** — PDFs are saved to `downloads/<folder name>/`
-   - **Links** — Paste one or more Scribd URLs (one per line, or mixed with other text — URLs are auto-extracted)
-   - **Parallel Browsers** — Number of Chrome instances to run simultaneously (default: 3). Each browser processes its share of URLs sequentially. Increase for faster batch downloads if your machine has enough RAM.
+Open this URL in your browser:
 
-4. **Click "Download All"** and watch the real-time progress log.
+```text
+http://localhost:5000
+```
 
-5. **Stop** — Click the Stop button to cancel remaining downloads. Already-saved PDFs are kept.
+Fill in:
 
-6. **Resume** — Re-submit the same links with the same folder name. Already-downloaded URLs (tracked in `downloads/<folder>/download_log.txt`) are automatically skipped.
+- **Folder Name** - PDFs are saved to `downloads/<folder name>/`.
+- **Links** - Paste one or more Scribd document URLs. Mixed text is okay.
+- **Parallel Browsers** - Number of Chrome workers to run at once. The default is `3`.
+
+Click **Download All**. The UI streams progress logs until the job finishes.
+
+Use **Stop** to cancel remaining downloads. Files already saved before cancellation stay in the output folder.
+
+To resume a batch, submit the same folder name and links again. URLs already present in `download_log.txt` are skipped.
 
 ### CLI
 
-1. **Run the script**
-   ```bash
-   python scribd-downloader.py
-   ```
+Run the original terminal workflow:
 
-2. **Choose a mode:**
-   - **Mode 1 (Single URL)** — Paste one Scribd URL
-   - **Mode 2 (Batch)** — Paste multiple URLs, one per line. Press Enter on an empty line when done.
-
-3. **Wait for the download** — The script will:
-   - Open the document in headless Chrome
-   - Scroll through all pages to load content
-   - Remove unwanted elements (toolbars, cookie banners)
-   - Save as PDF in the current directory
-
-4. **Done!** Your PDF will be saved with the document name from the URL.
-
----
-
-## Example Output
-
-```text
-$ python scribd-downloader.py
-Input link Scribd: https://www.scribd.com/document/903361807/WorkdaySimpleIntegrations-EIB-31v2
-
-Link embed: https://www.scribd.com/embeds/903361807/content
-Output filename: WorkdaySimpleIntegrations-EIB-31v2.pdf
-
-Starting Chrome browser...
-Cookie dialogs hidden.
-Found 316 pages, scrolling...
-  Scrolled 10/316 pages...
-  Scrolled 20/316 pages...
-  ...
-  Detected 617 pages after lazy loading, continuing...
-All 617 pages loaded.
-Top toolbar removed.
-Bottom toolbar removed.
-Adjusted 1 scroll containers for print.
-Print CSS injected.
-Render settle reached its time budget; continuing with best effort.
-
-Saving PDF as: WorkdaySimpleIntegrations-EIB-31v2.pdf
-  Page size: 10.44" x 13.50" (from .outer_page)
-  Margins: None
-  Headers/Footers: Disabled
-  ChromeDriver command timeout: 600s
-PDF saved successfully to: C:\Users\...\WorkdaySimpleIntegrations-EIB-31v2.pdf
-Browser closed.
+```bash
+python scribd-downloader.py
 ```
 
+Choose:
+
+- `1` for a single Scribd URL
+- `2` for batch mode
+
+Batch mode accepts one URL per line or pasted mixed text. Press Enter on an empty line when done.
+
 ---
 
-## PDF Settings
+## Output Structure
 
-| Setting | Value |
-|---------|-------|
-| Page Size | Detected dynamically from Scribd's rendered page |
-| Margins | None (0) |
-| Headers/Footers | Disabled |
-| Background Graphics | Enabled |
+Web UI downloads are saved like this:
+
+```text
+downloads/
+  My Folder/
+    document-one.pdf
+    document-two.pdf
+    download_log.txt
+```
+
+The log file stores completed URLs in this format:
+
+```text
+URL | filename.pdf | YYYY-MM-DD HH:MM:SS
+```
 
 ---
 
 ## How It Works
 
-1. **URL Conversion** - Converts Scribd document URL to embeddable format
-2. **Headless Browser** - Opens Chrome in background (invisible)
-3. **Page Loading** - Scrolls through all pages to trigger lazy-loading
-4. **Cleanup** - Removes toolbars, cookie banners, and overlays while preserving Scribd layout classes
-5. **Render Stabilization** - Waits for fonts, images, and page layout to settle before printing
-6. **Dynamic PDF Generation** - Detects the rendered page size and uses Chrome DevTools Protocol to generate the PDF directly
-7. **Auto Close** - Browser closes automatically after saving
+1. Scribd `/document/...` or `/doc/...` URLs are converted to embed URLs.
+2. Chrome opens the Scribd embed in headless mode.
+3. The downloader scrolls through the document to trigger lazy-loaded pages.
+4. Cookie banners, toolbars, and overlays are hidden or removed.
+5. The renderer waits for fonts, images, and layout to settle.
+6. The page size is detected from Scribd's rendered page wrapper.
+7. Chrome DevTools Protocol exports the PDF, using stream mode for large files.
+8. The web UI assigns batches across multiple worker browsers when parallel mode is used.
+
+---
+
+## Tuning
+
+Large or image-heavy documents may need more time. These environment variables are supported:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `SCRIBD_CDP_TIMEOUT` | `600` | ChromeDriver command timeout in seconds for PDF export |
+| `SCRIBD_RENDER_SETTLE_TIMEOUT` | `30` | Maximum time to wait for fonts, images, and layout to settle |
+| `SCRIBD_SCROLL_DELAY` | `0.15` | Delay between scroll steps while loading pages |
+| `SCRIBD_PDF_STREAM_CHUNK_SIZE` | `1048576` | Chunk size for streamed PDF output |
+| `SCRIBD_HEADLESS` | `1` | Set to `0` to run Chrome visibly for debugging |
+
+Example:
+
+```bash
+SCRIBD_CDP_TIMEOUT=900 SCRIBD_RENDER_SETTLE_TIMEOUT=45 python web.py
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:SCRIBD_CDP_TIMEOUT="900"
+$env:SCRIBD_RENDER_SETTLE_TIMEOUT="45"
+python web.py
+```
 
 ---
 
 ## Troubleshooting
 
-### "ChromeDriver not found" error
-The script uses Selenium Manager to auto-download ChromeDriver. If you face issues:
+### ChromeDriver issues
+
+Selenium Manager should handle ChromeDriver automatically. If browser startup fails, update Selenium:
+
 ```bash
 pip install --upgrade selenium
 ```
 
-### PDF not saving
-- Ensure you have write permissions in the current directory
-- Check if the Scribd URL is valid and accessible
-- For very large documents, increase `SCRIBD_CDP_TIMEOUT` (default: `600`)
+### Web UI starts but downloads do not run
 
-### Page counter looks too high while scrolling
-- Scribd creates extra internal page elements while lazy-loading
-- The scrolling progress is only a loading indicator and can be higher than the final PDF page count
+- Make sure Chrome is installed.
+- Try lowering **Parallel Browsers** to `1` or `2` if your machine is low on RAM.
+- Check the terminal running `python web.py` for backend errors.
 
-### Blank pages in PDF
-- Some documents may have DRM protection
-- Try increasing `SCRIBD_SCROLL_DELAY` if pages are not loading completely
-- If a document still renders incorrectly, try visible mode with `SCRIBD_HEADLESS=0`
+### PDFs are blank or incomplete
 
-### Large, image-heavy, or math-heavy documents
-You can tune the export with environment variables:
+- Some documents may be protected or not fully accessible.
+- Try `SCRIBD_HEADLESS=0` to watch Chrome load the page.
+- Increase `SCRIBD_SCROLL_DELAY` and `SCRIBD_RENDER_SETTLE_TIMEOUT`.
 
-```powershell
-$env:SCRIBD_CDP_TIMEOUT="900"
-$env:SCRIBD_RENDER_SETTLE_TIMEOUT="45"
-$env:SCRIBD_SCROLL_DELAY="0.2"
-python scribd-downloader.py
+### Resume skips a URL unexpectedly
+
+Check:
+
+```text
+downloads/<folder>/download_log.txt
 ```
 
-Useful variables:
-
-- `SCRIBD_CDP_TIMEOUT` - ChromeDriver command timeout in seconds for `Page.printToPDF`
-- `SCRIBD_RENDER_SETTLE_TIMEOUT` - Maximum time to wait for fonts/images/layout to settle before exporting
-- `SCRIBD_SCROLL_DELAY` - Delay between page scrolls when forcing lazy-loaded pages to render
-- `SCRIBD_PDF_STREAM_CHUNK_SIZE` - Chunk size used when reading a streamed PDF response from Chrome
-- `SCRIBD_HEADLESS=0` - Run with a visible browser when debugging rendering issues locally
+Remove the relevant line if you want to force that URL to download again.
 
 ---
 
-## Contributing
+## Prompt Helpers
 
-Contributions are welcome! Feel free to:
+This fork also includes prompt templates under `prompts/` for document extraction workflows:
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- `npwp_qwen3_vl_json_extraction.md`
+- `siup_qwen3_vl_json_extraction.md`
+- `npwp_siup_crosscheck_json_prompt.md`
 
----
-
-## Support the Project
-
-If you find this tool useful, consider supporting its development:
-
-<p align="center">
-  <a href="https://buymeacoffee.com/mrsami">
-    <img src="assets/buymeacoffee.svg" alt="Buy Me A Coffee" width="40" height="40">
-  </a>
-</p>
+These files are separate helpers and are not required for the Scribd download runtime.
 
 ---
 
-## License
+## Credits
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- Fork maintained at [niseruu/scribd-downloader-Parallel](https://github.com/niseruu/scribd-downloader-Parallel)
+- Original project by [Usama Nazir / themrsami](https://github.com/themrsami): [themrsami/scribd-downloader](https://github.com/themrsami/scribd-downloader)
 
 ---
 
 ## Disclaimer
 
-This tool is for educational purposes only. Please respect copyright laws and Scribd's Terms of Service. Only download documents you have the right to access.
-
----
-
-<p align="center">
-  Made with ❤️ by <a href="https://github.com/themrsami">Usama Nazir</a>
-</p>
-
-<p align="center">
-  If you find this useful, please consider giving it a ⭐
-</p>
+This tool is for educational purposes only. Respect copyright laws, Scribd's Terms of Service, and only download documents you have the right to access.
