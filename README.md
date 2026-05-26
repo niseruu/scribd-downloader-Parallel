@@ -103,13 +103,43 @@ The original project provides the core Selenium-based Scribd-to-PDF downloader. 
 
 ### Web UI
 
-Start the Flask server:
+Use the command set for your operating system, then open the local URL below.
+
+#### Linux
 
 ```bash
-python web.py
+cd scribd-downloader-Parallel
+source .venv/bin/activate
+python3 web.py
 ```
 
-Open this URL in your browser:
+#### macOS
+
+```bash
+cd scribd-downloader-Parallel
+source .venv/bin/activate
+python3 web.py
+```
+
+If `python3` is not available on macOS, install Python from [python.org](https://www.python.org/downloads/) or Homebrew first.
+
+#### Windows PowerShell
+
+```powershell
+cd scribd-downloader-Parallel
+.\.venv\Scripts\Activate.ps1
+py web.py
+```
+
+If PowerShell blocks the virtual environment activation script, run:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Then activate the environment again.
+
+After the server starts, open this URL in your browser:
 
 ```text
 http://localhost:5000
@@ -129,10 +159,30 @@ To resume a batch, submit the same folder name and links again. URLs already pre
 
 ### CLI
 
-Run the original terminal workflow:
+Run the terminal workflow with the command set for your operating system.
+
+#### Linux
 
 ```bash
-python scribd-downloader.py
+cd scribd-downloader-Parallel
+source .venv/bin/activate
+python3 scribd-downloader.py
+```
+
+#### macOS
+
+```bash
+cd scribd-downloader-Parallel
+source .venv/bin/activate
+python3 scribd-downloader.py
+```
+
+#### Windows PowerShell
+
+```powershell
+cd scribd-downloader-Parallel
+.\.venv\Scripts\Activate.ps1
+py scribd-downloader.py
 ```
 
 Choose:
