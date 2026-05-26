@@ -41,10 +41,13 @@ DEFAULT_PAPER_WIDTH_INCHES = 7.25
 DEFAULT_PAPER_HEIGHT_INCHES = 10.5
 
 
-def build_chrome_options():
+def build_chrome_options(profile_suffix=None):
     """Create Chrome options for reliable headless PDF generation."""
     options = Options()
-    runtime_profile_dir = os.path.join(os.getcwd(), ".chrome-runtime-profile")
+    dir_name = ".chrome-runtime-profile"
+    if profile_suffix:
+        dir_name = f".chrome-runtime-profile-{profile_suffix}"
+    runtime_profile_dir = os.path.join(os.getcwd(), dir_name)
     shutil.rmtree(runtime_profile_dir, ignore_errors=True)
     os.makedirs(runtime_profile_dir, exist_ok=True)
 
@@ -651,12 +654,24 @@ def save_pdf_directly(
         return None
 
 
-def main():
-    """Run the downloader interactively."""
-    input_url = input("Input link Scribd: ").strip()
+def download_document(driver, input_url, output_dir=None):
+    """
+    Download a single Scribd document as PDF using an existing browser session.
 
+    Args:
+        driver: An active Selenium WebDriver instance.
+        input_url: A Scribd document URL.
+        output_dir: Optional directory to save the PDF into.
+
+    Returns:
+        The absolute path of the saved PDF, or None on failure.
+    """
     converted_url = convert_scribd_link(input_url)
     pdf_filename = get_filename_from_url(input_url)
+
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        pdf_filename = os.path.join(output_dir, pdf_filename)
 
     print(f"Link embed: {converted_url}")
     print(f"Output filename: {pdf_filename}")
@@ -665,51 +680,137 @@ def main():
         print("Error: Please provide a valid Scribd document URL")
         print("Example: https://www.scribd.com/document/123456789/Document-Title")
         print("Example: https://www.scribd.com/doc/123456789/Document-Title")
-        raise SystemExit(1)
+        return None
+
+    driver.get(converted_url)
+    time.sleep(1)
+
+    hide_cookie_dialogs(driver)
+    print("Cookie dialogs hidden.")
+
+    total_pages = scroll_through_pages(driver, DEFAULT_SCROLL_DELAY_SECONDS)
+    if total_pages == 0:
+        print("No printable Scribd pages were detected on the embed page.")
+        return None
+
+    prepare_document_for_print(driver)
+    inject_print_styles(driver)
+    wait_for_render_stability(driver, DEFAULT_RENDER_SETTLE_TIMEOUT_SECONDS)
+    driver.execute_cdp_cmd("Emulation.setEmulatedMedia", {"media": "print"})
+    paper_size = detect_document_paper_size(driver)
+
+    driver.execute_script("window.scrollTo(0, 0);")
+
+    print(f"\nSaving PDF as: {pdf_filename}")
+    print(
+        f'  Page size: {paper_size["widthInches"]:.2f}" x '
+        f'{paper_size["heightInches"]:.2f}" '
+        f'(from {paper_size["selector"]})'
+    )
+    print("  Margins: None")
+    print("  Headers/Footers: Disabled")
+    print(f"  ChromeDriver command timeout: {DEFAULT_CDP_TIMEOUT_SECONDS}s")
+
+    saved_path = save_pdf_directly(driver, pdf_filename, paper_size=paper_size)
+    if not saved_path:
+        print("PDF export failed.")
+        return None
+
+    print(f"PDF saved successfully to: {saved_path}")
+    return saved_path
+
+
+def extract_urls_from_text(text):
+    """Extract all Scribd document URLs from a block of text."""
+    return re.findall(
+        r"https://www\.scribd\.com/(?:document|doc)/\d+/[^\s\"'<>]+", text
+    )
+
+
+def main():
+    """Run the downloader interactively with single or batch mode."""
+    print("Scribd Document Downloader")
+    print("=" * 40)
+    print("1) Single URL")
+    print("2) Batch download (multiple URLs)")
+    choice = input("Choose mode [1/2]: ").strip()
+
+    if choice == "2":
+        print(
+            "\nPaste your URLs (one per line, or mixed with other text)."
+            "\nPress Enter on an empty line when done:"
+        )
+        lines = []
+        while True:
+            line = input()
+            if line.strip() == "":
+                break
+            lines.append(line)
+
+        raw_text = "\n".join(lines)
+        urls = extract_urls_from_text(raw_text)
+
+        if not urls:
+            print("No valid Scribd URLs found in the input.")
+            raise SystemExit(1)
+
+        # Deduplicate while preserving order
+        seen = set()
+        unique_urls = []
+        for url in urls:
+            if url not in seen:
+                seen.add(url)
+                unique_urls.append(url)
+        urls = unique_urls
+
+        print(f"\nFound {len(urls)} document(s) to download:")
+        for i, url in enumerate(urls, 1):
+            print(f"  {i}. {url}")
+        print()
+    else:
+        url = input("Input link Scribd: ").strip()
+        if not url:
+            print("No URL provided.")
+            raise SystemExit(1)
+        urls = [url]
 
     driver = None
     runtime_profile_dir = None
+    succeeded = []
+    failed = []
 
     try:
-        print("\nStarting Chrome browser...")
+        print("Starting Chrome browser...")
         options, runtime_profile_dir = build_chrome_options()
         driver = webdriver.Chrome(options=options)
 
-        driver.get(converted_url)
-        time.sleep(1)
+        for i, url in enumerate(urls, 1):
+            print(f"\n{'=' * 40}")
+            print(f"Downloading {i}/{len(urls)}: {url}")
+            print("=" * 40)
 
-        hide_cookie_dialogs(driver)
-        print("Cookie dialogs hidden.")
+            try:
+                saved_path = download_document(driver, url)
+                if saved_path:
+                    succeeded.append((url, saved_path))
+                else:
+                    failed.append((url, "Download returned no file"))
+            except (RuntimeError, WebDriverException) as error:
+                print(f"Error downloading {url}: {error}")
+                failed.append((url, str(error)))
 
-        total_pages = scroll_through_pages(driver, DEFAULT_SCROLL_DELAY_SECONDS)
-        if total_pages == 0:
-            raise RuntimeError("No printable Scribd pages were detected on the embed page.")
-
-        prepare_document_for_print(driver)
-        inject_print_styles(driver)
-        wait_for_render_stability(driver, DEFAULT_RENDER_SETTLE_TIMEOUT_SECONDS)
-        driver.execute_cdp_cmd("Emulation.setEmulatedMedia", {"media": "print"})
-        paper_size = detect_document_paper_size(driver)
-
-        driver.execute_script("window.scrollTo(0, 0);")
-
-        print(f"\nSaving PDF as: {pdf_filename}")
-        print(
-            f'  Page size: {paper_size["widthInches"]:.2f}" x '
-            f'{paper_size["heightInches"]:.2f}" '
-            f'(from {paper_size["selector"]})'
-        )
-        print("  Margins: None")
-        print("  Headers/Footers: Disabled")
-        print(f"  ChromeDriver command timeout: {DEFAULT_CDP_TIMEOUT_SECONDS}s")
-
-        saved_path = save_pdf_directly(driver, pdf_filename, paper_size=paper_size)
-        if not saved_path:
-            raise RuntimeError("PDF export failed.")
-
-        print(f"PDF saved successfully to: {saved_path}")
+        print(f"\n{'=' * 40}")
+        print("BATCH DOWNLOAD COMPLETE")
+        print("=" * 40)
+        print(f"  Succeeded: {len(succeeded)}/{len(urls)}")
+        for url, path in succeeded:
+            print(f"    ✓ {path}")
+        if failed:
+            print(f"  Failed: {len(failed)}/{len(urls)}")
+            for url, reason in failed:
+                print(f"    ✗ {url} — {reason}")
     except (RuntimeError, WebDriverException) as error:
-        print(f"Download failed: {error}")
+        print(f"Fatal error: {error}")
         raise SystemExit(1)
     finally:
         if driver is not None:

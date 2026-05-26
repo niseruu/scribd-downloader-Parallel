@@ -36,17 +36,22 @@
 
 ## Features
 
-- **One-click download** - Just paste the Scribd URL and get your PDF
-- **Supports both Scribd URL styles** - Works with `/document/...` and legacy `/doc/...` links
-- **Runs in background** - Headless Chrome, no browser window pops up
-- **Fast processing** - Optimized scrolling and minimal wait times
-- **Clean PDFs** - No cookie banners, toolbars, or watermarks
-- **Large file friendly** - Uses a longer ChromeDriver timeout and streamed PDF export for big image-based documents
-- **Better math rendering** - Waits for fonts and render stability before printing, and preserves Scribd layout classes needed by equations/SVG
-- **Better pagination** - Uses Scribd's real page wrappers to avoid extra trailing pages
-- **Dynamic page size** - Detects the rendered Scribd page size instead of forcing one fixed sheet size
-- **Auto filename** - PDF named after the document URL automatically
-- **No login required** - Works without Scribd account
+- **One-click download** — Just paste the Scribd URL and get your PDF
+- **Web UI** — Browser-based interface with real-time progress logs
+- **Batch download** — Paste multiple links at once (CLI or Web UI)
+- **Parallel browsers** — Run N Chrome instances side-by-side to download faster
+- **Stop button** — Cancel a running batch from the web UI at any time
+- **Resume support** — A `download_log.txt` tracks completed URLs; re-submitting the same links skips already-downloaded files
+- **Duplicate detection** — Duplicate URLs are detected and skipped with a notification
+- **Retry on failure** — Each URL is retried up to 3 times with automatic browser restart
+- **Custom output folder** — Save PDFs into a named subfolder under `downloads/`
+- **Supports both URL styles** — Works with `/document/...` and legacy `/doc/...` links
+- **Runs in background** — Headless Chrome, no browser window pops up
+- **Clean PDFs** — No cookie banners, toolbars, or watermarks
+- **Dynamic page size** — Detects the rendered Scribd page size
+- **Large file friendly** — Streamed PDF export with longer timeouts
+- **Auto filename** — PDF named after the document URL automatically
+- **No login required** — Works without Scribd account
 
 ---
 
@@ -75,22 +80,38 @@
 
 ## Usage
 
+### Web UI (recommended)
+
+1. **Start the web server**
+   ```bash
+   python web.py
+   ```
+
+2. **Open** `http://localhost:5000` in your browser.
+
+3. **Fill in the form:**
+   - **Folder Name** — PDFs are saved to `downloads/<folder name>/`
+   - **Links** — Paste one or more Scribd URLs (one per line, or mixed with other text — URLs are auto-extracted)
+   - **Parallel Browsers** — Number of Chrome instances to run simultaneously (default: 3). Each browser processes its share of URLs sequentially. Increase for faster batch downloads if your machine has enough RAM.
+
+4. **Click "Download All"** and watch the real-time progress log.
+
+5. **Stop** — Click the Stop button to cancel remaining downloads. Already-saved PDFs are kept.
+
+6. **Resume** — Re-submit the same links with the same folder name. Already-downloaded URLs (tracked in `downloads/<folder>/download_log.txt`) are automatically skipped.
+
+### CLI
+
 1. **Run the script**
    ```bash
    python scribd-downloader.py
    ```
 
-2. **Paste the Scribd document URL** when prompted:
-   ```
-   Input link Scribd: https://www.scribd.com/document/123456789/Document-Title
-   ```
+2. **Choose a mode:**
+   - **Mode 1 (Single URL)** — Paste one Scribd URL
+   - **Mode 2 (Batch)** — Paste multiple URLs, one per line. Press Enter on an empty line when done.
 
-   Legacy Scribd URLs also work:
-   ```
-   Input link Scribd: https://www.scribd.com/doc/123456789/Document-Title
-   ```
-
-3. **Wait for the download** - The script will:
+3. **Wait for the download** — The script will:
    - Open the document in headless Chrome
    - Scroll through all pages to load content
    - Remove unwanted elements (toolbars, cookie banners)
